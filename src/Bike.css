@@ -1,0 +1,43 @@
+.bike {
+  width: 300px;
+  height: 100%;
+  /* background: red; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bike_axle {
+  width: 20px;
+  height: 150px;
+  /* position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -100%); */
+  border-radius: 30px;
+  position: relative;
+  border: 1px solid #333;
+}
+
+.bike_wheel {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  z-index: -1;
+  border: 1px solid #333;
+}
+
+.bike_chair {
+  position: absolute;
+  width: 80px;
+  height: 35px;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 15px 15px 0 0;
+  border: 1px solid #333;
+}
