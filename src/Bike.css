@@ -28,6 +28,9 @@
   border-radius: 30px;
   position: relative;
   border: 1px solid #333;
+  animation: rotate 3s infinite;
+  /* transform: skew(20deg); */
+  animation-direction: alternate;
 }
 
 .bike_wheel {
@@ -51,4 +54,14 @@
   transform: translate(-50%, -50%);
   border-radius: 15px 15px 0 0;
   border: 1px solid #333;
+  /* animation: rotate 10s infinite; */
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(20deg);
+  }
+  100% {
+    transform: rotate(-20deg);
+  }
 }

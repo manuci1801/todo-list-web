@@ -1,10 +1,13 @@
 pragma solidity ^0.5.0;
 
-contract BikeFactory {
+import "./Ownable.sol";
+import "./ERC721.sol";
+
+contract BikeFactory is Ownable, ERC721 {
     struct Bike {
         uint id;
         string name;
-        uint colors;
+        uint32 colors;
         uint level;
         uint32 ready;
     }
@@ -14,23 +17,29 @@ contract BikeFactory {
     
     uint public count = 0;
     
-    uint colorDigits = 10;
+    uint colorDigits = 16;
     uint colorModulus = 10 ** colorDigits;
     uint coolDownTime = 1 days;
-    uint levelUpFeeUnit = 0.001 ether;
+    uint feeUint = 0.001 ether;
     
     mapping (uint => address) public bikeToOwner;
     mapping (address => uint) ownerBikeCount;
     
+    // mapping bikeId => address approved to transfer
+    mapping (uint => address) bikeApprovals;
+    mapping (uint => address[]) bikeNeedApprovals;
+    
+    // events of contract
     event CreatedBike(uint id, string name, uint colors, uint level, uint32 ready);
     
     event LevelUpSuccess(uint id);
     
     event MergedTwoBike(uint from, uint to);
     
-    function _createBike(string memory _name, uint colors) internal {
+    // private function to create new bike
+    function _createBike(string memory _name, uint32 colors) internal {
         count++;
-        uint32 _ready = uint32(now + coolDownTime);
+        uint32 _ready = uint32(now);
         Bike memory _bike = Bike(count, _name, colors, 1, _ready);
         bikes[count] = _bike;
         bikeToOwner[count] = msg.sender;
@@ -38,7 +47,7 @@ contract BikeFactory {
         emit CreatedBike(count, _name, colors, 1, _ready);
     }
     
-    function _createBikeWithLevel(string memory _name, uint colors, uint level) internal {
+    function _createBikeWithLevel(string memory _name, uint32 colors, uint level) internal {
         count++;
         uint32 _ready = uint32(now + coolDownTime);
         Bike memory _bike = Bike(count, _name, colors, level, _ready);
@@ -48,13 +57,13 @@ contract BikeFactory {
         emit CreatedBike(count, _name, colors, level, _ready);
     }
     
-    function _randColors(string memory _name) internal view returns (uint){
+    function _randColors(string memory _name) internal view returns (uint32){
         uint rand = uint(keccak256(abi.encodePacked(_name)));
-        return rand % colorModulus;
+        return uint32(rand % colorModulus);
     }
     // crreate random bike
     function createRandomBike(string memory _name) public {
-        uint colors = _randColors(_name);
+        uint32 colors = _randColors(_name);
         _createBike(_name, colors);
     }
     
@@ -71,11 +80,18 @@ contract BikeFactory {
         return _bikes;
     }
     
+    // trigger check cool-down time to level up
+    modifier _isCoolDown(uint _id) {
+        Bike memory _bike = bikes[_id];
+        require(_bike.ready < now, "must have to cool-down time");
+        _;
+    }
     // level up of bike
-    function levelUp(uint _id) public payable onlyOwnerOf(_id) {
+    function levelUp(uint _id) public payable onlyOwnerOf(_id) _isCoolDown(_id) {
         Bike storage _bike = bikes[_id];
-        require(msg.value >= uint(_bike.level*levelUpFeeUnit), "Not enough wei to level up");
+        require(msg.value >= uint(_bike.level*feeUint), "Not enough wei to level up");
         bikes[_id].level++;
+        bikes[_id].ready = bikes[_id].ready + uint32(now);
         emit LevelUpSuccess(_id);
     }
     
@@ -90,8 +106,8 @@ contract BikeFactory {
         require(_from != _to, "bikeId can not to be same");
         Bike memory _fromBike = bikes[_from];
         Bike memory _toBike = bikes[_to];
-        uint colors = (_fromBike.colors + _toBike.colors) / 2;
-        colors = colors % colorModulus;
+        uint32 colors = (_fromBike.colors + _toBike.colors) / 2;
+        colors = uint32(colors % colorModulus);
         uint _level = _fromBike.level + _toBike.level;
         _createBikeWithLevel(_name, colors, _level);
         _deleteBike(_from);
@@ -104,4 +120,59 @@ contract BikeFactory {
         require(msg.sender == bikeToOwner[_id], "Must is owner of bike");
         _;
     }
+    
+    // get bikes of different people
+    function getDifferentOwnerBikes() public view returns(uint [] memory) {
+        uint[] memory _bikes = new uint[](count - ownerBikeCount[msg.sender]);
+        uint counter = 0;
+        for(uint i = 1; i <= count; i++) {
+            if(bikeToOwner[i] != msg.sender) {
+                _bikes[counter] = i;
+                counter++;
+            }
+        }
+        return _bikes;
+    }
+    
+    
+    function balanceOf(address _owner) external view returns (uint256) {
+        return ownerBikeCount[_owner];
+    }
+
+    function ownerOf(uint256 _tokenId) external view returns (address) {
+        return bikeToOwner[_tokenId];
+    }
+
+    function _transfer(address _from, address _to, uint256 _tokenId) private {
+        ownerBikeCount[_from]--;
+        ownerBikeCount[_to]++;
+        bikeToOwner[_tokenId] = _to;
+        emit Transfer(_from, _to, _tokenId);
+        
+    }
+
+    function transferFrom(address _from, address _to, uint256 _tokenId) external payable {
+        require(bikeToOwner[_tokenId] == msg.sender || bikeApprovals[_tokenId] == msg.sender);
+        _transfer(_from, _to, _tokenId);
+        delete bikeApprovals[_tokenId];
+    }
+
+    function approve(address _approved, uint256 _tokenId) external payable onlyOwnerOf(_tokenId) {
+        bikeApprovals[_tokenId] = _approved;
+        emit Approval(msg.sender, _approved, _tokenId);
+    }
+    
+    // get all bikes approve to transfer
+    function getBikeApprovals() public view returns (uint[] memory) {
+        uint[] memory _bikes = new uint[](ownerBikeCount[msg.sender]);
+        uint counter = 0;
+        for(uint i = 1; i <= count; i++) {
+           if(bikeApprovals[i] != address(0)) {
+               _bikes[counter] = i;
+               counter++;
+           }
+        }
+        return _bikes;
+    }
+    
 }

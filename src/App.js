@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Web3 from "web3";
+import { ethers } from "ethers";
 import "./App.css";
 import Bike from "./Bike";
 
@@ -9,9 +10,11 @@ const App = () => {
   const [appWeb3, setAppWeb3] = useState(null);
   const [appContract, setAppContract] = useState(null);
   const [userAddress, setUserAddress] = useState("");
+  const [provider, setProvider] = useState(null);
 
   const [bikeName, setBikeName] = useState("");
   const [bikes, setBikes] = useState([]);
+  const [differentBikes, setDifferentBikes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [bikesSelected, setBikesSelected] = useState([]);
@@ -19,22 +22,34 @@ const App = () => {
 
   useEffect(() => {
     const loadInitData = async () => {
-      let web3;
+      let web3, provider;
       const { web3: _web3, ethereum } = window;
 
       // load web3
       if (typeof ethereum !== "undefined") {
         await ethereum.enable();
         web3 = new Web3(ethereum);
+        // provider = new ethers.providers.Web3Provider(ethereum);
       } else if (typeof _web3 !== "undefined") {
         web3 = new Web3(_web3.currentProvider);
+        // provider = new ethers.providers.Web3Provider(_web3.currentProvider);
       } else {
         web3 = new Web3(
           new Web3.providers.HttpProvider("http://localhost:8545")
         );
+        // provider = new ethers.providers.JsonRpcProvider();
       }
 
+      // const signer = provider.getSigner(0);
+      // const contract = new ethers.Contract(
+      //   BikeConfig.address,
+      //   BikeConfig.abi,
+      //   signer
+      // );
+      // setAppContract(contract);
+
       if (web3) {
+        web3.eth.handleRevert = true;
         setAppWeb3(web3);
         // load user's address
         web3.eth.getAccounts((err, accounts) => setUserAddress(accounts[0]));
@@ -47,8 +62,9 @@ const App = () => {
           BikeConfig.abi,
           BikeConfig.address
         );
-        // get tasks
+        // // get tasks
         getOwnerBikes(contract);
+        getDifferentOwnerBikes(contract);
         // set contract to state
         setAppContract(contract);
       } else {
@@ -57,6 +73,12 @@ const App = () => {
     };
     loadInitData();
   }, []);
+
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     if (appContract) eventsListen(appContract);
+  //   }, 300);
+  // }, []);
 
   // get all owner's bikes
   const getOwnerBikes = async (contract) => {
@@ -79,6 +101,30 @@ const App = () => {
     }
   };
 
+  // get different owner's bikes max 10
+  const getDifferentOwnerBikes = async (contract) => {
+    try {
+      const bikeArr = await contract.methods
+        .getDifferentOwnerBikes()
+        .call({ from: userAddress });
+      let bikes = [];
+      // console.log(bikeArr);
+      if (bikeArr && bikeArr.length > 0) {
+        for (let id of bikeArr) {
+          if (id != 0) {
+            const _bike = await contract.methods.bikes(id).call();
+            // console.log(_bike);
+            if (_bike.id != "0") bikes = [...bikes, _bike];
+          }
+        }
+      }
+      await setDifferentBikes(bikes);
+      setLoading(false);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   // listen event CreatedBike from contract
   const createdBike = () => {
     return appContract.getPastEvents("CreatedBike", {}, (err, result) => {
@@ -89,11 +135,19 @@ const App = () => {
         if (updateMergeSuccess) setUpdateMergeSuccess(false);
       }
     });
+    // return appContract.events.CreatedBike();
   };
 
   // handle on click create new bike
   const createRandomBike = () => {
     if (bikeName) {
+      // return appContract
+      //   .createRandomBike(bikeName, { from: userAddress })
+      //   .then((res) => eventsListen())
+      //   .catch((err) => {
+      //     if (err.data && err.data.message) return alert(err.data.message);
+      //     console.log(err);
+      //   });
       return appContract.methods
         .createRandomBike(bikeName)
         .send({ from: userAddress })
@@ -117,9 +171,38 @@ const App = () => {
     });
   };
 
+  const eventsListen = (contract) => {
+    contract.on("CreatedBike", (author, oldValue, newValue, event) => {
+      // Called when anyone changes the value
+
+      console.log(author.toString());
+      // "0x14791697260E4c9A71f18484C9f997B308e59325"
+
+      console.log(oldValue);
+      // "Hello World"
+
+      console.log(newValue.toString());
+      // "Ilike turtles."
+
+      // See Event Emitter below for all properties on Event
+      console.log(event.blockNumber);
+      // 4115004
+    });
+  };
+
   // handle on cick level up
   const levelUp = async (id, level) => {
-    if (id && level)
+    if (id && level) {
+      // return appContract
+      //   .levelUp(id, {
+      //     from: userAddress,
+      //     value: ethers.utils.parseEther(0.001 * level + ""),
+      //   })
+      //   .then((res) => console.log(res))
+      //   .catch((err) => {
+      //     if (err.data && err.data.message) return alert(err.data.message);
+      //     console.log(err);
+      //   });
       return appContract.methods
         .levelUp(id)
         .send({
@@ -130,8 +213,9 @@ const App = () => {
           levelUpSuccess();
         })
         .on("error", (err) => {
-          console.log(JSON.parse(err.message));
+          console.log(err);
         });
+    }
   };
 
   // handle on click select a bike
@@ -214,6 +298,34 @@ const App = () => {
     }
   };
 
+  // listen event Transfer from contract
+  const transferSuccess = () => {
+    return appContract.getPastEvents("Transfer", {}, (err, result) => {
+      if (!err) {
+        getOwnerBikes(appContract);
+        getDifferentOwnerBikes(appContract);
+      }
+    });
+  };
+
+  // transfer bike to other people
+  const transferBike = (id) => {
+    const address = window.prompt(
+      "Enter address which you want to transfer to"
+    );
+    if (appWeb3.utils.isAddress(address))
+      return appContract.methods
+        .transferFrom(userAddress, address, id)
+        .send({ from: userAddress })
+        .on("receipt", (result) => {
+          transferSuccess();
+        })
+        .on("error", (err) => {
+          console.log(err);
+        });
+    else alert("Please enter a valid address");
+  };
+
   return (
     <div>
       <div className="main">
@@ -238,9 +350,11 @@ const App = () => {
                   <Bike
                     key={idx}
                     bike={bike}
+                    isOwner={true}
                     levelUp={levelUp}
                     handleSelectBike={handleSelectBike}
                     bikesSelected={bikesSelected}
+                    transferBike={transferBike}
                   />
                 ))}
               </div>
@@ -258,6 +372,13 @@ const App = () => {
                 >
                   Merge two bike
                 </button>
+              </div>
+              <hr />
+              <div>Other bikes</div>
+              <div className="list-bikes">
+                {differentBikes.map((bike, idx) => (
+                  <Bike key={idx} bike={bike} />
+                ))}
               </div>
             </>
           )

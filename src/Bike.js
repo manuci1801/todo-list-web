@@ -3,7 +3,14 @@ import "./Bike.css";
 
 import colors from "./colors";
 
-const Bike = ({ bike, levelUp, handleSelectBike, bikesSelected }) => {
+const Bike = ({
+  bike,
+  isOwner = false,
+  levelUp,
+  transferBike,
+  handleSelectBike = (id) => null,
+  bikesSelected = [],
+}) => {
   const { id, name, colors: _colors, level, ready } = bike;
   const wheel = (_colors.slice(0, 2) % 7) + 1;
   const axle = (_colors.slice(2, 4) % 4) + 1;
@@ -28,9 +35,23 @@ const Bike = ({ bike, levelUp, handleSelectBike, bikesSelected }) => {
       </div>
       <div className="bike_name">{name}</div>
       <div className="bike_level">Level: {level}</div>
-      <div>
-        <button onClick={() => levelUp(id, level)}>Level up</button>
-      </div>
+      {isOwner && (
+        <>
+          <div>
+            <button onClick={() => levelUp(id, level)}>Level up</button>
+          </div>
+          <div>
+            <button onClick={() => transferBike(id)}>Transfer</button>
+          </div>
+        </>
+      )}
+      {!isOwner && (
+        <>
+          <div>
+            <button onClick={() => console.log("buy")}>Buy</button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
