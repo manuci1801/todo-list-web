@@ -7,14 +7,15 @@ import Bike from "./Bike";
 import BikeConfig from "./Bike.json";
 
 const App = () => {
-  const [appWeb3, setAppWeb3] = useState(null);
-  const [appContract, setAppContract] = useState(null);
+  const [appWeb3, setAppWeb3] = useState(undefined);
+  const [appContract, setAppContract] = useState(undefined);
   const [userAddress, setUserAddress] = useState("");
   const [provider, setProvider] = useState(null);
 
   const [bikeName, setBikeName] = useState("");
   const [bikes, setBikes] = useState([]);
   const [differentBikes, setDifferentBikes] = useState([]);
+  const [bikesSold, setBikesSold] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [bikesSelected, setBikesSelected] = useState([]);
@@ -62,9 +63,7 @@ const App = () => {
           BikeConfig.abi,
           BikeConfig.address
         );
-        // // get tasks
-        getOwnerBikes(contract);
-        getDifferentOwnerBikes(contract);
+
         // set contract to state
         setAppContract(contract);
       } else {
@@ -72,13 +71,27 @@ const App = () => {
       }
     };
     loadInitData();
-  }, []);
+    const interval = setInterval(() => {
+      // console.log(appWeb3);
+      if (typeof appWeb3 !== "undefined") {
+        appWeb3.eth.getAccounts((err, accounts) => {
+          if (accounts[0] !== userAddress) {
+            setUserAddress(accounts[0]);
+          }
+        });
+      }
+    }, 300);
+    return () => clearInterval(interval);
+  }, [appWeb3, userAddress]);
 
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     if (appContract) eventsListen(appContract);
-  //   }, 300);
-  // }, []);
+  useEffect(() => {
+    if (typeof appContract !== "undefined") {
+      getOwnerBikes(appContract);
+      // getDifferentOwnerBikes(contract);
+      getListBikesSold(appContract);
+      getListBikesSoldOfYourself(appContract);
+    }
+  }, [appContract]);
 
   // get all owner's bikes
   const getOwnerBikes = async (contract) => {
@@ -95,6 +108,52 @@ const App = () => {
         }
       }
       await setBikes(bikes);
+      setLoading(false);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // get list bikes sold of yourself
+  const getListBikesSoldOfYourself = async (contract) => {
+    try {
+      const bikeArr = await contract.methods
+        .getBikesSoldOfYourself()
+        .call({ from: userAddress });
+      let bikes = [];
+      // console.log(bikeArr);
+      if (bikeArr && bikeArr.length > 0) {
+        for (let id of bikeArr) {
+          if (+id !== 0) {
+            const _bike = await contract.methods.bikes(id).call();
+            bikes = [...bikes, _bike];
+          }
+        }
+      }
+      await setBikesSold(bikes);
+      setLoading(false);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // get list bikes sold of different
+  const getListBikesSold = async (contract) => {
+    try {
+      const bikeArr = await contract.methods
+        .getBikesSold()
+        .call({ from: userAddress });
+      let bikes = [];
+      // console.log(bikeArr);
+      if (bikeArr && bikeArr.length > 0) {
+        for (let id of bikeArr) {
+          if (+id !== 0) {
+            const _bike = await contract.methods.bikes(id).call();
+            bikes = [...bikes, _bike];
+          }
+        }
+      }
+      await setDifferentBikes(bikes);
       setLoading(false);
     } catch (error) {
       console.log(error);
@@ -154,6 +213,7 @@ const App = () => {
         .on("receipt", (data) => {
           setBikeName("");
           createdBike();
+          alert("Created bike");
         })
         .on("error", (err) => console.log(err));
     }
@@ -213,7 +273,13 @@ const App = () => {
           levelUpSuccess();
         })
         .on("error", (err) => {
+          console.log(err.message);
           console.log(err);
+          if (err && err.message) {
+            let idx = err.message.indexOf(`"reason":"`);
+            const reason = err.message.slice(idx + 10).split(`"}`)[0];
+            return alert(reason);
+          }
         });
     }
   };
@@ -319,11 +385,41 @@ const App = () => {
         .send({ from: userAddress })
         .on("receipt", (result) => {
           transferSuccess();
+          alert("Transfer success");
         })
         .on("error", (err) => {
           console.log(err);
         });
     else alert("Please enter a valid address");
+  };
+
+  // sell bike
+  const sellBike = (id) => {
+    return appContract.methods
+      .sellBike(id)
+      .send({ from: userAddress })
+      .on("receipt", (result) => {
+        // getListBikesSold(appContract);
+        getListBikesSoldOfYourself(appContract);
+        alert("Success, wait someone buy it");
+      })
+      .on("error", (err) => {
+        console.log(err);
+      });
+  };
+
+  const cancelSell = (id) => {
+    return appContract.methods
+      .cancelSellBike(id)
+      .send({ from: userAddress })
+      .on("receipt", (result) => {
+        // getListBikesSold(appContract);
+        getListBikesSoldOfYourself(appContract);
+        alert("Cancel success");
+      })
+      .on("error", (err) => {
+        console.log(err);
+      });
   };
 
   return (
@@ -352,6 +448,7 @@ const App = () => {
                     bike={bike}
                     isOwner={true}
                     levelUp={levelUp}
+                    sellBike={sellBike}
                     handleSelectBike={handleSelectBike}
                     bikesSelected={bikesSelected}
                     transferBike={transferBike}
@@ -374,7 +471,20 @@ const App = () => {
                 </button>
               </div>
               <hr />
-              <div>Other bikes</div>
+              <div>Your bikes are sold</div>
+              <div className="list-bikes">
+                {bikesSold.map((bike, idx) => (
+                  <Bike
+                    key={idx}
+                    bike={bike}
+                    isOwner={true}
+                    isSold={true}
+                    cancelSell={cancelSell}
+                  />
+                ))}
+              </div>
+              <hr />
+              <div>Bikes are sold</div>
               <div className="list-bikes">
                 {differentBikes.map((bike, idx) => (
                   <Bike key={idx} bike={bike} />

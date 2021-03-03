@@ -28,7 +28,7 @@
   border-radius: 30px;
   position: relative;
   border: 1px solid #333;
-  animation: rotate 3s infinite;
+  animation: rotate 5s infinite;
   /* transform: skew(20deg); */
   animation-direction: alternate;
 }

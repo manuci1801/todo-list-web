@@ -6,8 +6,11 @@ import colors from "./colors";
 const Bike = ({
   bike,
   isOwner = false,
+  isSold = false,
   levelUp,
   transferBike,
+  sellBike,
+  cancelSell,
   handleSelectBike = (id) => null,
   bikesSelected = [],
 }) => {
@@ -22,7 +25,13 @@ const Bike = ({
         className={!bikesSelected.includes(id) ? "bike" : "bike active"}
         onClick={() => handleSelectBike(id)}
       >
-        <div className="bike_axle" style={{ background: colors.axle[axle] }}>
+        <div
+          className="bike_axle"
+          style={{
+            background: colors.axle[axle],
+            animationDuration: 5 / level + "s",
+          }}
+        >
           <div
             className="bike_wheel"
             style={{ background: colors.wheel[wheel] }}
@@ -35,13 +44,23 @@ const Bike = ({
       </div>
       <div className="bike_name">{name}</div>
       <div className="bike_level">Level: {level}</div>
-      {isOwner && (
+      {isOwner && !isSold && (
         <>
           <div>
             <button onClick={() => levelUp(id, level)}>Level up</button>
           </div>
           <div>
             <button onClick={() => transferBike(id)}>Transfer</button>
+          </div>
+          <div>
+            <button onClick={() => sellBike(id)}>Sell</button>
+          </div>
+        </>
+      )}
+      {isSold && (
+        <>
+          <div>
+            <button onClick={() => cancelSell(id)}>Cancel</button>
           </div>
         </>
       )}

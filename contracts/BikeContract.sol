@@ -27,14 +27,19 @@ contract BikeFactory is Ownable, ERC721 {
     
     // mapping bikeId => address approved to transfer
     mapping (uint => address) bikeApprovals;
-    mapping (uint => address[]) bikeNeedApprovals;
+    mapping (uint => address) public bikesSold;
     
     // events of contract
-    event CreatedBike(uint id, string name, uint colors, uint level, uint32 ready);
+    event CreatedBike(uint indexed id, string name, uint colors, uint level, uint32 ready);
     
-    event LevelUpSuccess(uint id);
+    event LevelUpSuccess(uint indexed id);
     
-    event MergedTwoBike(uint from, uint to);
+    event MergedTwoBike(uint indexed from, uint indexed to);
+    
+    // change level up fee by owner of contract
+    function changeFeeUint(uint _fee) public onlyOwner() {
+        feeUint = _fee;
+    }
     
     // private function to create new bike
     function _createBike(string memory _name, uint32 colors) internal {
@@ -160,6 +165,42 @@ contract BikeFactory is Ownable, ERC721 {
     function approve(address _approved, uint256 _tokenId) external payable onlyOwnerOf(_tokenId) {
         bikeApprovals[_tokenId] = _approved;
         emit Approval(msg.sender, _approved, _tokenId);
+    }
+    
+    // sell a bike from different
+    function sellBike(uint256 _id) public onlyOwnerOf(_id) {
+        bikesSold[_id] = msg.sender;
+    }
+    
+    function cancelSellBike(uint256 _id) public onlyOwnerOf(_id) {
+        require(bikesSold[_id] != address(0));
+        delete bikesSold[_id];
+    }
+    
+    // get all list bikes are sold of yourself
+    function getBikesSoldOfYourself() public view returns (uint[] memory) {
+        uint[] memory _bikes = new uint[](ownerBikeCount[msg.sender]);
+        uint counter = 0;
+        for(uint i = 1; i <= count; i++) {
+            if(bikesSold[i] != address(0) && bikesSold[i] == msg.sender) {
+                _bikes[counter] = i;
+                counter++;
+            }
+        }
+        return _bikes;
+    }
+    
+    // get all list bikes are sold of different
+    function getBikesSold() public view returns (uint[] memory) {
+        uint[] memory _bikes = new uint[](count - ownerBikeCount[msg.sender]);
+        uint counter = 0;
+        for(uint i = 1; i <= count; i++) {
+            if(bikesSold[i] != address(0) && bikesSold[i] != msg.sender) {
+                _bikes[counter] = i;
+                counter++;
+            }
+        }
+        return _bikes;
     }
     
     // get all bikes approve to transfer
