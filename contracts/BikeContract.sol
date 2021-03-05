@@ -12,22 +12,29 @@ contract BikeFactory is Ownable, ERC721 {
         uint32 ready;
     }
     
- 
-    mapping (uint => Bike) public bikes;
-    
+    // list all bikes
     uint public count = 0;
+    mapping(uint => Bike) public bikes;
+    
+    mapping(address => uint) ownerBikeCount;
+    mapping(uint => address) public bikeToOwner;
     
     uint colorDigits = 16;
     uint colorModulus = 10 ** colorDigits;
     uint coolDownTime = 1 days;
     uint feeUint = 0.001 ether;
     
-    mapping (uint => address) public bikeToOwner;
-    mapping (address => uint) ownerBikeCount;
+    // list all bikes are selling
+    uint bikeSoldCount = 0;
+    mapping(uint => address) public bikesSold;
+    mapping(address => uint) ownerBikeSoldCount;
+    
     
     // mapping bikeId => address approved to transfer
-    mapping (uint => address) bikeApprovals;
-    mapping (uint => address) public bikesSold;
+    mapping(uint => address) bikeApprovals;
+    mapping(address=> uint) ownerBikeApprovalsCount;
+    
+    mapping(uint => address[]) requestBuys;
     
     // events of contract
     event CreatedBike(uint indexed id, string name, uint colors, uint level, uint32 ready);
@@ -117,12 +124,20 @@ contract BikeFactory is Ownable, ERC721 {
         _createBikeWithLevel(_name, colors, _level);
         _deleteBike(_from);
         _deleteBike(_to);
+        delete bikesSold[_from];
+        delete bikesSold[_to];
         emit MergedTwoBike(_from, _to);
     }
     
     // modifier function check is owner of bike
     modifier onlyOwnerOf(uint _id) {
         require(msg.sender == bikeToOwner[_id], "Must is owner of bike");
+        _;
+    }
+    
+    // check is not owner of bike
+    modifier onlyNotOwnerOf(uint _id) {
+        require(msg.sender != bikeToOwner[_id], "Must is not owner of bike");
         _;
     }
     
@@ -164,22 +179,27 @@ contract BikeFactory is Ownable, ERC721 {
 
     function approve(address _approved, uint256 _tokenId) external payable onlyOwnerOf(_tokenId) {
         bikeApprovals[_tokenId] = _approved;
+        ownerBikeApprovalsCount[_approved]++;
         emit Approval(msg.sender, _approved, _tokenId);
     }
     
     // sell a bike from different
     function sellBike(uint256 _id) public onlyOwnerOf(_id) {
         bikesSold[_id] = msg.sender;
+        bikeSoldCount++;
+        ownerBikeSoldCount[msg.sender]++;
     }
     
     function cancelSellBike(uint256 _id) public onlyOwnerOf(_id) {
         require(bikesSold[_id] != address(0));
         delete bikesSold[_id];
+        bikeSoldCount--;
+         ownerBikeSoldCount[msg.sender]--;
     }
     
     // get all list bikes are sold of yourself
     function getBikesSoldOfYourself() public view returns (uint[] memory) {
-        uint[] memory _bikes = new uint[](ownerBikeCount[msg.sender]);
+        uint[] memory _bikes = new uint[](ownerBikeSoldCount[msg.sender]);
         uint counter = 0;
         for(uint i = 1; i <= count; i++) {
             if(bikesSold[i] != address(0) && bikesSold[i] == msg.sender) {
@@ -192,7 +212,7 @@ contract BikeFactory is Ownable, ERC721 {
     
     // get all list bikes are sold of different
     function getBikesSold() public view returns (uint[] memory) {
-        uint[] memory _bikes = new uint[](count - ownerBikeCount[msg.sender]);
+        uint[] memory _bikes = new uint[](bikeSoldCount - ownerBikeCount[msg.sender]);
         uint counter = 0;
         for(uint i = 1; i <= count; i++) {
             if(bikesSold[i] != address(0) && bikesSold[i] != msg.sender) {
@@ -203,12 +223,41 @@ contract BikeFactory is Ownable, ERC721 {
         return _bikes;
     }
     
+    // check is bike sold
+     modifier onlyBikeSold(uint _id) {
+        require(bikesSold[_id] != address(0), "bike is not sold");
+        _;
+    }
+    
+    // request buy bike from not owner of bike
+    function requestBuyBike(uint _id) public onlyNotOwnerOf(_id) onlyBikeSold(_id) {
+        address[] storage _addresses = requestBuys[_id];
+        bool flag = false;
+        for(uint i = 0; i < _addresses.length; i++) {
+            if(_addresses[i] == msg.sender) {
+                flag = true;
+                break;
+            }
+        }
+        if(flag) {
+            revert("Already request buy this bike");
+        } else {
+            _addresses.push(msg.sender);
+        }
+    }
+    
+    // get request buy of a owner bike 
+    function getRequestBuyOwnerBike(uint _id) public view onlyOwnerOf(_id) returns (address[] memory) {
+        address[] memory _addresses = requestBuys[_id];
+        return _addresses;
+    }
+    
     // get all bikes approve to transfer
     function getBikeApprovals() public view returns (uint[] memory) {
-        uint[] memory _bikes = new uint[](ownerBikeCount[msg.sender]);
+        uint[] memory _bikes = new uint[](ownerBikeApprovalsCount[msg.sender]);
         uint counter = 0;
         for(uint i = 1; i <= count; i++) {
-           if(bikeApprovals[i] != address(0)) {
+           if(bikeApprovals[i] == msg.sender) {
                _bikes[counter] = i;
                counter++;
            }

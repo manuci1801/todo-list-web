@@ -16,6 +16,7 @@ const App = () => {
   const [bikes, setBikes] = useState([]);
   const [differentBikes, setDifferentBikes] = useState([]);
   const [bikesSold, setBikesSold] = useState([]);
+  const [bikeAcceptedToBuy, setBikeAcceptedToBuy] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [bikesSelected, setBikesSelected] = useState([]);
@@ -52,8 +53,12 @@ const App = () => {
       if (web3) {
         web3.eth.handleRevert = true;
         setAppWeb3(web3);
+
         // load user's address
-        web3.eth.getAccounts((err, accounts) => setUserAddress(accounts[0]));
+        web3.eth.getAccounts((err, accounts) => {
+          setUserAddress(accounts[0]);
+          setLoading(false);
+        });
 
         // get network id to detect address from build json file
         const networkId = await web3.eth.net.getId();
@@ -63,35 +68,56 @@ const App = () => {
           BikeConfig.abi,
           BikeConfig.address
         );
-
+        // console.log(contract);
         // set contract to state
         setAppContract(contract);
+
+        // console.log("mount");
+        getOwnerBikes(contract);
+        //     // getDifferentOwnerBikes(contract);
+        getListBikesSold(contract);
+        getListBikesSoldOfYourself(contract);
+        getBikeApprovals(contract);
+
+        // listen events
+        // approveTransfer(contract);
       } else {
         alert("Cannot detect web3");
       }
     };
     loadInitData();
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       // console.log(appWeb3);
       if (typeof appWeb3 !== "undefined") {
         appWeb3.eth.getAccounts((err, accounts) => {
           if (accounts[0] !== userAddress) {
+            // console.log("mount");
             setUserAddress(accounts[0]);
           }
         });
       }
     }, 300);
     return () => clearInterval(interval);
-  }, [appWeb3, userAddress]);
+  }, [appWeb3, userAddress, appContract]);
 
-  useEffect(() => {
-    if (typeof appContract !== "undefined") {
-      getOwnerBikes(appContract);
-      // getDifferentOwnerBikes(contract);
-      getListBikesSold(appContract);
-      getListBikesSoldOfYourself(appContract);
-    }
-  }, [appContract]);
+  // useEffect(() => {
+  //   if (!loading) {
+  //     if (typeof appContract !== "undefined" && !!userAddress) {
+  //       // console.log("mount");
+  //       getOwnerBikes(appContract);
+  //       //     // getDifferentOwnerBikes(appContract);
+  //       getListBikesSold(appContract);
+  //       getListBikesSoldOfYourself(appContract);
+  //       getBikeApprovals(appContract);
+
+  //       // listen events
+  //       approveTransfer(appContract);
+  //     }
+  //   }
+  // }, [loading]);
 
   // get all owner's bikes
   const getOwnerBikes = async (contract) => {
@@ -108,7 +134,6 @@ const App = () => {
         }
       }
       await setBikes(bikes);
-      setLoading(false);
     } catch (error) {
       console.log(error);
     }
@@ -126,12 +151,15 @@ const App = () => {
         for (let id of bikeArr) {
           if (+id !== 0) {
             const _bike = await contract.methods.bikes(id).call();
+            const _addresses = await contract.methods
+              .getRequestBuyOwnerBike(id)
+              .call();
+            _bike.addressesBuy = _addresses;
             bikes = [...bikes, _bike];
           }
         }
       }
       await setBikesSold(bikes);
-      setLoading(false);
     } catch (error) {
       console.log(error);
     }
@@ -149,12 +177,33 @@ const App = () => {
         for (let id of bikeArr) {
           if (+id !== 0) {
             const _bike = await contract.methods.bikes(id).call();
-            bikes = [...bikes, _bike];
+            // console.log(_bike);
+            if (_bike.id !== "0") bikes = [...bikes, _bike];
           }
         }
       }
       await setDifferentBikes(bikes);
-      setLoading(false);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // get all approvals bikes and need confirm to buy
+  const getBikeApprovals = async (contract) => {
+    try {
+      const bikeArr = await contract.methods
+        .getBikeApprovals()
+        .call({ from: userAddress });
+      let addresses = [];
+      for (let id of bikeArr) {
+        const address = await contract.methods
+          .bikeToOwner(id)
+          .call({ from: userAddress });
+        const bike = await contract.methods.bikes(id).call();
+        console.log(bike);
+        addresses = [...addresses, { bike, address }];
+      }
+      setBikeAcceptedToBuy([...addresses]);
     } catch (error) {
       console.log(error);
     }
@@ -178,7 +227,6 @@ const App = () => {
         }
       }
       await setDifferentBikes(bikes);
-      setLoading(false);
     } catch (error) {
       console.log(error);
     }
@@ -213,7 +261,6 @@ const App = () => {
         .on("receipt", (data) => {
           setBikeName("");
           createdBike();
-          alert("Created bike");
         })
         .on("error", (err) => console.log(err));
     }
@@ -273,11 +320,8 @@ const App = () => {
           levelUpSuccess();
         })
         .on("error", (err) => {
-          console.log(err.message);
-          console.log(err);
           if (err && err.message) {
-            let idx = err.message.indexOf(`"reason":"`);
-            const reason = err.message.slice(idx + 10).split(`"}`)[0];
+            const reason = getReasonString(err.message);
             return alert(reason);
           }
         });
@@ -334,6 +378,7 @@ const App = () => {
           arr = deleteBikeFromArray(to, arr);
           setBikes([...arr]);
           setBikesSelected([]);
+          getListBikesSoldOfYourself(appContract);
           setUpdateMergeSuccess(true);
         }
       }
@@ -422,6 +467,73 @@ const App = () => {
       });
   };
 
+  const acceptCanBuyBike = (address, id) => {
+    return appContract.methods
+      .approve(address, id)
+      .send({ from: userAddress })
+      .on("receipt", (result) => {
+        console.log(result);
+      })
+      .on("error", (err) => {
+        if (err && err.message) {
+          const reason = getReasonString(err.message);
+          return alert(reason);
+        }
+      });
+  };
+
+  const requestBuyBike = (id) => {
+    return appContract.methods
+      .requestBuyBike(id)
+      .send({ from: userAddress })
+      .on("receipt", (result) => {
+        console.log(result);
+      })
+      .on("error", (err) => {
+        if (err && err.message) {
+          const reason = getReasonString(err.message);
+          return alert(reason);
+        }
+      });
+  };
+
+  // get revert string from smart contract
+  const getReasonString = (message) => {
+    let idx = message.indexOf(`"reason":"`);
+    return message.slice(idx + 10).split(`"}`)[0];
+  };
+
+  const approveTransfer = (contract) => {
+    return contract.getPastEvents(
+      "Approval",
+      { filter: { _approve: userAddress } },
+      (err, result) => {
+        if (!err) {
+          console.log(result);
+        }
+      }
+    );
+  };
+
+  const confirmBuyBike = (id, address) => {
+    if (window.confirm(`Do you want to buy "${id}" from "${address}"`))
+      if (appWeb3.utils.isAddress(address))
+        return appContract.methods
+          .transferFrom(address, userAddress, id)
+          .send({ from: userAddress })
+          .on("receipt", (result) => {
+            // transferSuccess();
+            getOwnerBikes(appContract);
+            getBikeApprovals(appContract);
+            getListBikesSold(appContract);
+            alert("Transfer success");
+          })
+          .on("error", (err) => {
+            console.log(err);
+          });
+      else return alert("Please enter a valid address");
+  };
+
   return (
     <div>
       <div className="main">
@@ -439,8 +551,32 @@ const App = () => {
         {loading ? (
           <h3>Loading data from contract...</h3>
         ) : (
-          bikes.length > 0 && (
+          (bikes.length > 0 ||
+            bikesSold.length > 0 ||
+            bikeAcceptedToBuy.length > 0) && (
             <>
+              <div>Bikes are approved to buy</div>
+              <div className="list-bikes">
+                {bikeAcceptedToBuy.map((bike) => (
+                  <div key={bike.address}>
+                    <div>
+                      <Bike
+                        bike={bike.bike}
+                        isOwner={false}
+                        isAcceptToBuy={true}
+                      />
+                    </div>
+                    <div>{bike.address}</div>
+                    <button
+                      onClick={() => confirmBuyBike(bike.bike.id, bike.address)}
+                    >
+                      Confirm buy
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <hr />
+              <div>Your bike</div>
               <div className="list-bikes">
                 {bikes.map((bike, idx) => (
                   <Bike
@@ -471,7 +607,7 @@ const App = () => {
                 </button>
               </div>
               <hr />
-              <div>Your bikes are sold</div>
+              <div>Your bikes are selling</div>
               <div className="list-bikes">
                 {bikesSold.map((bike, idx) => (
                   <Bike
@@ -480,14 +616,15 @@ const App = () => {
                     isOwner={true}
                     isSold={true}
                     cancelSell={cancelSell}
+                    acceptCanBuyBike={acceptCanBuyBike}
                   />
                 ))}
               </div>
               <hr />
-              <div>Bikes are sold</div>
+              <div>Different bikes are selling are selling</div>
               <div className="list-bikes">
                 {differentBikes.map((bike, idx) => (
-                  <Bike key={idx} bike={bike} />
+                  <Bike key={idx} bike={bike} requestBuyBike={requestBuyBike} />
                 ))}
               </div>
             </>

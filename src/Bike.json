@@ -1,5 +1,5 @@
 {
-  "address": "0x066eE0fEEfc82b4B3D5FA8E7D63Aa533bF13260d",
+  "address": "0x53EF0194742Be563Bd4440fD5d3cF846c4F501b4",
   "abi": [
     {
       "anonymous": false,
@@ -237,6 +237,21 @@
           "type": "uint256"
         }
       ],
+      "name": "requestBuyBike",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
       "name": "sellBike",
       "outputs": [],
       "payable": false,
@@ -364,6 +379,21 @@
           "internalType": "uint32",
           "name": "ready",
           "type": "uint32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "bikeSoldCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "payable": false,
@@ -504,6 +534,27 @@
     },
     {
       "constant": true,
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getRequestBuyOwnerBike",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
       "inputs": [],
       "name": "isOwner",
       "outputs": [
@@ -526,6 +577,27 @@
           "internalType": "address",
           "name": "",
           "type": "address"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "ownerBikeSoldCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "payable": false,

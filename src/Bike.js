@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "./Bike.css";
 
 import colors from "./colors";
@@ -11,13 +11,18 @@ const Bike = ({
   transferBike,
   sellBike,
   cancelSell,
+  isAcceptToBuy = false,
+  acceptCanBuyBike,
+  requestBuyBike,
   handleSelectBike = (id) => null,
   bikesSelected = [],
 }) => {
-  const { id, name, colors: _colors, level, ready } = bike;
+  const { id, name, colors: _colors, level, ready, addressesBuy = [] } = bike;
   const wheel = (_colors.slice(0, 2) % 7) + 1;
   const axle = (_colors.slice(2, 4) % 4) + 1;
   const chair = (_colors.slice(4, 6) % 5) + 1;
+
+  const [addressToSellFor, setAddressToSellFor] = useState("");
 
   return (
     <div>
@@ -44,32 +49,57 @@ const Bike = ({
       </div>
       <div className="bike_name">{name}</div>
       <div className="bike_level">Level: {level}</div>
-      {isOwner && !isSold && (
-        <>
-          <div>
-            <button onClick={() => levelUp(id, level)}>Level up</button>
-          </div>
-          <div>
-            <button onClick={() => transferBike(id)}>Transfer</button>
-          </div>
-          <div>
-            <button onClick={() => sellBike(id)}>Sell</button>
-          </div>
-        </>
-      )}
-      {isSold && (
-        <>
-          <div>
-            <button onClick={() => cancelSell(id)}>Cancel</button>
-          </div>
-        </>
-      )}
-      {!isOwner && (
-        <>
-          <div>
-            <button onClick={() => console.log("buy")}>Buy</button>
-          </div>
-        </>
+      {isOwner ? (
+        !isSold ? (
+          <>
+            <div>
+              <button onClick={() => levelUp(id, level)}>Level up</button>
+            </div>
+            <div>
+              <button onClick={() => transferBike(id)}>Transfer</button>
+            </div>
+            <div>
+              <button onClick={() => sellBike(id)}>Sell</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <button onClick={() => cancelSell(id)}>Cancel</button>
+            </div>
+            {addressesBuy.length > 0 && (
+              <div>
+                <div>Choose address to accept buy:</div>
+                <button
+                  style={{
+                    cursor: !!addressToSellFor ? "pointer" : "not-allowed",
+                  }}
+                  onClick={() => acceptCanBuyBike(addressToSellFor, id)}
+                >
+                  Accept to buy
+                </button>
+                {addressesBuy.map((address) => (
+                  <div
+                    onClick={() => setAddressToSellFor(address)}
+                    key={address}
+                  >
+                    {addressToSellFor === address
+                      ? `${address}: CHOSE`
+                      : address}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )
+      ) : (
+        !isAcceptToBuy && (
+          <>
+            <div>
+              <button onClick={() => requestBuyBike(id)}>Buy</button>
+            </div>
+          </>
+        )
       )}
     </div>
   );
