@@ -75,12 +75,12 @@ const App = () => {
         // console.log("mount");
         getOwnerBikes(contract);
         //     // getDifferentOwnerBikes(contract);
-        getListBikesSold(contract);
-        getListBikesSoldOfYourself(contract);
+        getBikesSelling(contract);
+        getOwnerBikesSelling(contract);
         getBikeApprovals(contract);
 
         // listen events
-        // approveTransfer(contract);
+        approveTransfer(contract);
       } else {
         alert("Cannot detect web3");
       }
@@ -109,8 +109,8 @@ const App = () => {
   //       // console.log("mount");
   //       getOwnerBikes(appContract);
   //       //     // getDifferentOwnerBikes(appContract);
-  //       getListBikesSold(appContract);
-  //       getListBikesSoldOfYourself(appContract);
+  //       getBikesSelling(appContract);
+  //       getOwnerBikesSelling(appContract);
   //       getBikeApprovals(appContract);
 
   //       // listen events
@@ -140,10 +140,10 @@ const App = () => {
   };
 
   // get list bikes sold of yourself
-  const getListBikesSoldOfYourself = async (contract) => {
+  const getOwnerBikesSelling = async (contract) => {
     try {
       const bikeArr = await contract.methods
-        .getBikesSoldOfYourself()
+        .getOwnerBikesSelling()
         .call({ from: userAddress });
       let bikes = [];
       // console.log(bikeArr);
@@ -166,10 +166,10 @@ const App = () => {
   };
 
   // get list bikes sold of different
-  const getListBikesSold = async (contract) => {
+  const getBikesSelling = async (contract) => {
     try {
       const bikeArr = await contract.methods
-        .getBikesSold()
+        .getBikesSelling()
         .call({ from: userAddress });
       let bikes = [];
       // console.log(bikeArr);
@@ -378,7 +378,7 @@ const App = () => {
           arr = deleteBikeFromArray(to, arr);
           setBikes([...arr]);
           setBikesSelected([]);
-          getListBikesSoldOfYourself(appContract);
+          getOwnerBikesSelling(appContract);
           setUpdateMergeSuccess(true);
         }
       }
@@ -444,8 +444,8 @@ const App = () => {
       .sellBike(id)
       .send({ from: userAddress })
       .on("receipt", (result) => {
-        // getListBikesSold(appContract);
-        getListBikesSoldOfYourself(appContract);
+        // getBikesSelling(appContract);
+        getOwnerBikesSelling(appContract);
         alert("Success, wait someone buy it");
       })
       .on("error", (err) => {
@@ -458,8 +458,8 @@ const App = () => {
       .cancelSellBike(id)
       .send({ from: userAddress })
       .on("receipt", (result) => {
-        // getListBikesSold(appContract);
-        getListBikesSoldOfYourself(appContract);
+        // getBikesSelling(appContract);
+        getOwnerBikesSelling(appContract);
         alert("Cancel success");
       })
       .on("error", (err) => {
@@ -468,18 +468,21 @@ const App = () => {
   };
 
   const acceptCanBuyBike = (address, id) => {
-    return appContract.methods
-      .approve(address, id)
-      .send({ from: userAddress })
-      .on("receipt", (result) => {
-        console.log(result);
-      })
-      .on("error", (err) => {
-        if (err && err.message) {
-          const reason = getReasonString(err.message);
-          return alert(reason);
-        }
-      });
+    if (!address) return;
+    if (appWeb3.utils.isAddress(address))
+      return appContract.methods
+        .approve(address, id)
+        .send({ from: userAddress })
+        .on("receipt", (result) => {
+          console.log(result);
+        })
+        .on("error", (err) => {
+          if (err && err.message) {
+            const reason = getReasonString(err.message);
+            return alert(reason);
+          }
+        });
+    else return alert("invalid address");
   };
 
   const requestBuyBike = (id) => {
@@ -506,7 +509,7 @@ const App = () => {
   const approveTransfer = (contract) => {
     return contract.getPastEvents(
       "Approval",
-      { filter: { _approve: userAddress } },
+      { filter: { _approve: userAddress }, fromBlock: 0, toBlock: "latest" },
       (err, result) => {
         if (!err) {
           console.log(result);
@@ -525,7 +528,7 @@ const App = () => {
             // transferSuccess();
             getOwnerBikes(appContract);
             getBikeApprovals(appContract);
-            getListBikesSold(appContract);
+            getBikesSelling(appContract);
             alert("Transfer success");
           })
           .on("error", (err) => {

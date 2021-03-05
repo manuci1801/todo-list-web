@@ -25,9 +25,9 @@ contract BikeFactory is Ownable, ERC721 {
     uint feeUint = 0.001 ether;
     
     // list all bikes are selling
-    uint bikeSoldCount = 0;
+    uint public bikeSoldCount = 0;
     mapping(uint => address) public bikesSold;
-    mapping(address => uint) ownerBikeSoldCount;
+    mapping(address => uint) public ownerBikeSoldCount;
     
     
     // mapping bikeId => address approved to transfer
@@ -173,6 +173,12 @@ contract BikeFactory is Ownable, ERC721 {
 
     function transferFrom(address _from, address _to, uint256 _tokenId) external payable {
         require(bikeToOwner[_tokenId] == msg.sender || bikeApprovals[_tokenId] == msg.sender);
+        if(bikeApprovals[_tokenId] == msg.sender) {
+            ownerBikeApprovalsCount[msg.sender]--;
+            delete bikesSold[_tokenId];
+            bikeSoldCount--;
+            ownerBikeSoldCount[_from]--;
+        }
         _transfer(_from, _to, _tokenId);
         delete bikeApprovals[_tokenId];
     }
@@ -194,7 +200,7 @@ contract BikeFactory is Ownable, ERC721 {
         require(bikesSold[_id] != address(0));
         delete bikesSold[_id];
         bikeSoldCount--;
-         ownerBikeSoldCount[msg.sender]--;
+        ownerBikeSoldCount[msg.sender]--;
     }
     
     // get all list bikes are sold of yourself
@@ -212,7 +218,7 @@ contract BikeFactory is Ownable, ERC721 {
     
     // get all list bikes are sold of different
     function getBikesSold() public view returns (uint[] memory) {
-        uint[] memory _bikes = new uint[](bikeSoldCount - ownerBikeCount[msg.sender]);
+        uint[] memory _bikes = new uint[](count);
         uint counter = 0;
         for(uint i = 1; i <= count; i++) {
             if(bikesSold[i] != address(0) && bikesSold[i] != msg.sender) {
